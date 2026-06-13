@@ -1,0 +1,14 @@
+cassio
+datasets
+langchain
+langchain-community 
+langchain-openai  
+cassandra-driver
+openai
+tiktoken
+inngest 
+llama-index-core 
+llama-index-readers-file 
+qdrant-client 
+uvicorn 
+streamlit
