@@ -13,7 +13,9 @@ import datetime
 
 from data_load import load_chunk_pdf, embed_texts
 from vector_db import QdrantStorage
-from custom import RagChunkSrc, RAGQueryResult, RAGSearchResult, RAGUpsertResult
+from custom import RagChunkSrc, RAGQueryResult, RAGSearchResult, RAGUpsertResult, ChatRequest
+
+from llm import generate_answer
 
 load_dotenv()
 
@@ -21,6 +23,33 @@ inngest_client=inngest.Inngest(app_id='rag_app', logger=logging.getLogger("uvico
 
 store=QdrantStorage()
 model = SentenceTransformer("all-MiniLM-L6-v2")
+
+def rag_pipeline(question: str, top_k: int = 5):
+    query_vec = model.encode(question)
+
+    found = store.search(query_vec, top_k)
+
+    content_block = "\n\n".join(found["contexts"])
+
+    prompt = f"""
+    Use the following context to answer the question.
+
+    Context:
+    {content_block}
+
+    Question:
+    {question}
+
+    Answer:
+    """
+
+    answer = generate_answer(prompt)
+
+    return {
+        "answer": answer,
+        "contexts": found["contexts"],
+        "sources": found["sources"]
+    }
 
 @inngest_client.create_function(
     fn_id="RAG: Ingest PDF",
@@ -71,12 +100,21 @@ async def query_df(ctx: inngest.Context):
         f"Question: {ques}\n"
         "Answer correctly using the context above"
     )
-    return {
-    "contexts": found.contexts,
-    "sources": found.sources,
-    "prompt": user_content}
+
+    answer = generate_answer(user_content)
+
+    return {"answer": answer, "contexts": found.contexts, "sources": found.sources}
 
 app=FastAPI()
+
+@app.post("/chat")
+def chat(req: ChatRequest):
+    result = rag_pipeline(req.query, req.top_k)
+
+    return {
+        "answer": result["answer"],
+        "sources": result["sources"]
+    }
 
 inngest.fast_api.serve(app, inngest_client, functions=[ingest_pdf, query_df])
 

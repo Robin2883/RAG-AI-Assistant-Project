@@ -15,3 +15,7 @@ class RAGQueryResult(BaseModel):
     answer: str
     sources: list[str]
     num_contexts: int
+
+class ChatRequest(BaseModel):
+    query: str
+    top_k: int = 5
